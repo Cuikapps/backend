@@ -1,5 +1,4 @@
-export interface userUpdateDto {
+export interface UserUpdateDto {
   displayName?: string;
-  password?: string;
   photoURL?: string;
 }

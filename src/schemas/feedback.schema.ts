@@ -6,6 +6,9 @@ export type FeedbackDocument = Feedback & Document;
 @Schema()
 export class Feedback {
   @Prop({ required: true })
+  title: string;
+
+  @Prop({ required: false })
   app: string;
 
   @Prop({ required: true })

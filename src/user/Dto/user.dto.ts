@@ -1,5 +1,5 @@
-export interface userDto {
-  id: string;
+export interface UserDto {
+  uid: string;
   displayName: string;
   email: string;
   emailVerified: boolean;

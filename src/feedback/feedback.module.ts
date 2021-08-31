@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { FeedbackSchema } from 'src/schemas/feedback.schema';
+import { FeedbackSchema } from '../schemas/feedback.schema';
 import { FeedbackController } from './feedback.controller';
 import { FeedbackService } from './feedback.service';
 

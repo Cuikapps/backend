@@ -1,0 +1,13 @@
+runtime: nodejs14 # or another supported version
+
+instance_class: F2
+
+env_variables:
+  APP_ROOT: 'https://cuikapps.uc.r.appspot.com/api'
+  Apptray: 'mongodb+srv://cuikapps-db:Vu5lA4BeL0BHrv91@cluster0.kyyms.mongodb.net/Apptray?retryWrites=true&w=majority'
+  UsersDB: 'mongodb+srv://cuikapps-db:Vu5lA4BeL0BHrv91@cluster0.kyyms.mongodb.net/Users?retryWrites=true&w=majority'
+  FeedbackDB: 'mongodb+srv://cuikapps-db:Vu5lA4BeL0BHrv91@cluster0.kyyms.mongodb.net/Feedback?retryWrites=true&w=majority'
+
+handlers:
+  - url: /.*
+    script: auto

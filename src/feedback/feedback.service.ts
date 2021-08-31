@@ -5,7 +5,7 @@ https://docs.nestjs.com/providers#services
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { FeedbackDocument } from 'src/schemas/feedback.schema';
+import { FeedbackDocument } from '../schemas/feedback.schema';
 import { FeedbackDto } from './feedback';
 
 @Injectable()
@@ -24,6 +24,7 @@ export class FeedbackService {
     switch (feedbackDto.feedbackType) {
       case 'issue': {
         const feedback = new this.feedbackIssuesModel({
+          title: feedbackDto.title,
           app: feedbackDto.app,
           desc: feedbackDto.desc,
         });
@@ -33,6 +34,7 @@ export class FeedbackService {
       }
       case 'suggestion': {
         const feedback = new this.feedbackSuggestionModel({
+          title: feedbackDto.title,
           app: feedbackDto.app,
           desc: feedbackDto.desc,
         });
@@ -42,7 +44,7 @@ export class FeedbackService {
       }
       case 'other': {
         const feedback = new this.feedbackOtherModel({
-          app: feedbackDto.app,
+          title: feedbackDto.title,
           desc: feedbackDto.desc,
         });
 

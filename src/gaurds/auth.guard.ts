@@ -15,6 +15,8 @@ export class AuthGuard implements CanActivate {
   ): boolean | Promise<boolean> | Observable<boolean> {
     const req = context.switchToHttp().getRequest();
 
+    console.log(req.cookies);
+
     if (req.cookies?.['token']) {
       return this.auth.verifyUserToken(req.cookies?.['token']);
     } else {

@@ -9,9 +9,7 @@ import {
   Query,
   Post,
   Req,
-  UploadedFile,
   UseGuards,
-  UseInterceptors,
   StreamableFile,
   Header,
   Param,
@@ -20,7 +18,6 @@ import {
   Delete,
   Res,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { AuthGuard } from '../gaurds/auth.guard';
 import { UserAuthDto } from '../user/Dto/userAuth.dto';
@@ -31,6 +28,7 @@ import { UserUpdateDto } from '../user/Dto/userUpdate.dto';
 import { UserDto } from '../user/Dto/user.dto';
 import { EnvService } from '../feature/env/env.service';
 import { UserPassResetDto } from '../user/Dto/userPassReserDto';
+import { FileDto } from './Dto/file.dto';
 @Controller('/auth')
 export class AuthController {
   constructor(
@@ -48,12 +46,11 @@ export class AuthController {
       const token = await this.auth.signIn(userInfo.email, userInfo.password);
 
       res.cookie('token', token, {
-        maxAge: 30 * 24 * 60 * 60,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
         httpOnly: true,
-        domain: this.env.Dev ? undefined : 'cuikapps.com',
         secure: !this.env.Dev,
-        sameSite: this.env.Dev ? undefined : 'strict',
         path: '/',
+        sameSite: 'none',
       });
     } catch (error) {
       throw new HttpException(error, HttpStatus.BAD_REQUEST);
@@ -61,22 +58,18 @@ export class AuthController {
   }
 
   @Post('/sign-out')
-  @UseGuards(AuthGuard)
   async signOut(@Res({ passthrough: true }) res: Response): Promise<void> {
     res.cookie('token', 'none', {
       maxAge: -60,
       httpOnly: true,
-      domain: this.env.Dev ? undefined : 'cuikapps.com',
       secure: !this.env.Dev,
-      sameSite: this.env.Dev ? undefined : 'strict',
       path: '/',
+      sameSite: 'none',
     });
   }
 
   @Post('/sign-up')
   async signUp(@Body() userInfo: UserCreateDto) {
-    console.log(userInfo);
-
     try {
       if (userInfo.displayName) {
         await this.auth.signUpWithName(
@@ -175,22 +168,20 @@ export class AuthController {
 
   @Post('/upload')
   @UseGuards(AuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(
-    @UploadedFile() file: Express.Multer.File,
-    @Query('ext') ext: string,
-    @Query('uid') uid: string,
-  ): Promise<void> {
-    if (uid !== '') {
-      try {
-        const normalFilePath = `uploads/profileImages/${uid}.${ext}`;
+  async uploadFile(@Body() file: FileDto, @Req() req: Request): Promise<void> {
+    try {
+      const cookie: string = req.cookies.token;
+      const uid: string = cookie.split('-')[0];
 
-        await this.auth.uploadUserPhoto(normalFilePath, file, uid, ext);
-      } catch (error) {
-        throw new HttpException(error, HttpStatus.CONFLICT);
-      }
-    } else {
-      throw new HttpException('Invalid File Name', HttpStatus.BAD_REQUEST);
+      await this.auth.uploadUserPhoto(
+        file.formData.file_buffer,
+        uid,
+        file.formData.type,
+      );
+    } catch (error) {
+      console.log(error);
+
+      throw new HttpException(error, HttpStatus.CONFLICT);
     }
   }
 
@@ -200,14 +191,13 @@ export class AuthController {
     @Param('imageName') imgName: string,
   ): Promise<StreamableFile> {
     try {
-      return this.auth.getUserImage(imgName);
+      return await this.auth.getUserImage(imgName);
     } catch (error) {
       throw new HttpException(error, HttpStatus.CONFLICT);
     }
   }
 
   @Post('/confirm-email')
-  @UseGuards(AuthGuard)
   async confirmEmail(@Query('email') email: string) {
     try {
       const user = await this.users.userByEmail(email);

@@ -1,3 +1,4 @@
+import { FileService } from './feature/env/file.service';
 import { FeatureModule } from './feature/feature.module';
 import { NewsModule } from './news/news.module';
 import { Module } from '@nestjs/common';

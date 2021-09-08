@@ -14,13 +14,13 @@ import * as bcrypt from 'bcrypt';
 import * as sgMail from '@sendgrid/mail';
 import { UserDocument } from '../schemas/user.schema';
 import { sgApiKey } from '../sendgrid';
-import * as fs from 'fs';
 import * as admin from 'firebase-admin';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PendingPasswordDocument } from '../schemas/pending-password.schema';
 import { EnvService } from '../feature/env/env.service';
 import { UserPassResetDto } from '../user/Dto/userPassReserDto';
+import { FileService } from '../feature/env/file.service';
 
 @Injectable()
 export class AuthService {
@@ -29,6 +29,7 @@ export class AuthService {
     @InjectModel('PendingPassword')
     private readonly pendingPasswordModel: Model<PendingPasswordDocument>,
     private readonly env: EnvService,
+    private readonly file: FileService,
   ) {
     this.pendingPasswordModel.createIndexes();
   }
@@ -80,7 +81,7 @@ export class AuthService {
     });
 
     if (newUser) {
-      return;
+      await this.verifyUserEmail(newUser);
     } else {
       throw new HttpException('User Not Created', HttpStatus.BAD_REQUEST);
     }
@@ -97,35 +98,34 @@ export class AuthService {
   }
 
   async uploadUserPhoto(
-    path: string,
-    file: Express.Multer.File,
-    uid: string,
+    fileBuffer: string,
+    name: string,
     ext: string,
-  ): Promise<string> {
+  ): Promise<void> {
     try {
-      const normalFileStream = fs.createWriteStream(path, {
-        encoding: 'binary',
-      });
+      const uid = name.split('.')[0];
 
-      normalFileStream.write(file.buffer);
-      normalFileStream.end();
+      const file = admin.storage().bucket().file(`profileImages/${name}`);
+      console.log('File Created');
 
-      await admin
-        .storage()
-        .bucket()
-        .upload(path, {
-          destination: `profileImages/${uid}.${ext}`,
-          contentType: `image/${ext}`,
-        });
-
-      fs.unlinkSync(path);
-
+      // Update user profile image link
       const user = await this.users.userById(uid);
+      console.log('Got user');
 
-      user.photoURL = `${this.env.Root}/auth/get-profile-image/${uid}.${ext}`;
+      const buffer = Buffer.from(fileBuffer, 'binary');
+
+      await file.save(buffer, {
+        contentType: 'image/' + ext,
+        gzip: false,
+        public: false,
+      });
+      console.log('File Saved');
+
+      // The file upload is complete
+      user.photoURL = `${this.env.Root}/auth/get-profile-image/${name}`;
 
       await user.save();
-      return `${this.env.Root}/auth/get-profile-image/${uid}.${ext}`;
+      console.log('User updated');
     } catch (error) {
       throw new HttpException(error, HttpStatus.BAD_REQUEST);
     }
@@ -133,17 +133,11 @@ export class AuthService {
 
   async getUserImage(imgName: string): Promise<StreamableFile> {
     try {
-      const dest = process.cwd() + '/downloads/profileImages/' + imgName;
+      const fileBuffer = await this.file.readFromGCP(
+        `profileImages/${imgName}`,
+      );
 
-      await admin.storage().bucket().file(`profileImages/${imgName}`).download({
-        destination: dest,
-      });
-
-      const fileReader = fs.readFileSync(dest);
-
-      fs.unlinkSync(dest);
-
-      return new StreamableFile(fileReader);
+      return new StreamableFile(fileBuffer);
     } catch (error) {
       throw new HttpException(error, HttpStatus.BAD_REQUEST);
     }
@@ -219,7 +213,13 @@ export class AuthService {
       },
     };
     try {
-      await sgMail.send(msg);
+      await sgMail.send(msg, false, (err, res) => {
+        if (err) {
+          console.error(err);
+        } else if (res) {
+          console.log(res);
+        }
+      });
     } catch (error) {
       throw new HttpException(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }

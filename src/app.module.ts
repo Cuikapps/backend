@@ -1,4 +1,4 @@
-import { FileService } from './feature/env/file.service';
+import { ApptrayModule } from './apptray/apptray.module';
 import { FeatureModule } from './feature/feature.module';
 import { NewsModule } from './news/news.module';
 import { Module } from '@nestjs/common';
@@ -12,6 +12,7 @@ import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ApptrayModule,
     FeatureModule,
     AuthModule,
     UserModule,

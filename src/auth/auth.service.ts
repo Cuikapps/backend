@@ -20,7 +20,7 @@ import { Model } from 'mongoose';
 import { PendingPasswordDocument } from '../schemas/pending-password.schema';
 import { EnvService } from '../feature/env/env.service';
 import { UserPassResetDto } from '../user/Dto/userPassReserDto';
-import { FileService } from '../feature/env/file.service';
+import { StorageService } from '../feature/storage/storage.service';
 
 @Injectable()
 export class AuthService {
@@ -29,7 +29,7 @@ export class AuthService {
     @InjectModel('PendingPassword')
     private readonly pendingPasswordModel: Model<PendingPasswordDocument>,
     private readonly env: EnvService,
-    private readonly file: FileService,
+    private readonly storage: StorageService,
   ) {
     this.pendingPasswordModel.createIndexes();
   }
@@ -106,11 +106,9 @@ export class AuthService {
       const uid = name.split('.')[0];
 
       const file = admin.storage().bucket().file(`profileImages/${name}`);
-      console.log('File Created');
 
       // Update user profile image link
       const user = await this.users.userById(uid);
-      console.log('Got user');
 
       const buffer = Buffer.from(fileBuffer, 'binary');
 
@@ -119,13 +117,11 @@ export class AuthService {
         gzip: false,
         public: false,
       });
-      console.log('File Saved');
 
       // The file upload is complete
       user.photoURL = `${this.env.Root}/auth/get-profile-image/${name}`;
 
       await user.save();
-      console.log('User updated');
     } catch (error) {
       throw new HttpException(error, HttpStatus.BAD_REQUEST);
     }
@@ -133,7 +129,7 @@ export class AuthService {
 
   async getUserImage(imgName: string): Promise<StreamableFile> {
     try {
-      const fileBuffer = await this.file.readFromGCP(
+      const fileBuffer = await this.storage.readFile(
         `profileImages/${imgName}`,
       );
 

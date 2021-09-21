@@ -47,10 +47,10 @@ export class AuthController {
 
       res.cookie('token', token, {
         maxAge: 30 * 24 * 60 * 60 * 1000,
-        httpOnly: true,
+        httpOnly: !this.env.Dev,
         secure: !this.env.Dev,
         path: '/',
-        sameSite: 'none',
+        sameSite: this.env.Dev ? undefined : 'none',
       });
     } catch (error) {
       throw new HttpException(error, HttpStatus.BAD_REQUEST);
@@ -61,10 +61,10 @@ export class AuthController {
   async signOut(@Res({ passthrough: true }) res: Response): Promise<void> {
     res.cookie('token', 'none', {
       maxAge: -60,
-      httpOnly: true,
+      httpOnly: !this.env.Dev,
       secure: !this.env.Dev,
       path: '/',
-      sameSite: 'none',
+      sameSite: this.env.Dev ? undefined : 'none',
     });
   }
 

@@ -5,6 +5,8 @@ https://docs.nestjs.com/controllers#controllers
 import {
   Body,
   Controller,
+  Delete,
+  Get,
   HttpException,
   HttpStatus,
   Post,
@@ -12,8 +14,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { FolderNode } from 'src/schemas/fileTree.schema';
 import { AuthGuard } from '../gaurds/auth.guard';
 import { ApptrayService } from './apptray.service';
+import { DeleteDTO } from './Dto/delete.dto';
+import { GetFilesDTO } from './Dto/getFile.dto';
+import { RenameDTO } from './Dto/rename.dto';
+import { SettingsDTO } from './Dto/settings.dto';
 import { UploadFileDTO } from './Dto/uploadFile.dto';
 import { UploadFolderDTO } from './Dto/uploadFolder.dto';
 
@@ -21,10 +28,54 @@ import { UploadFolderDTO } from './Dto/uploadFolder.dto';
 export class ApptrayController {
   constructor(private readonly apptray: ApptrayService) {}
 
-  @Post('/update-config')
+  @Get('/get-settings')
   @UseGuards(AuthGuard)
-  async updateConfig() {
-    return;
+  async getSettings(@Req() request: Request): Promise<Required<SettingsDTO>> {
+    try {
+      return await this.apptray.getSettings(
+        request.cookies.token.split('-')[0],
+      );
+    } catch (error) {
+      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Post('/set-settings')
+  @UseGuards(AuthGuard)
+  async SetSettings(
+    @Body() settings: SettingsDTO,
+    @Req() request: Request,
+  ): Promise<Required<SettingsDTO>> {
+    try {
+      return await this.apptray.updateSettings(
+        settings,
+        request.cookies.token.split('-')[0],
+      );
+    } catch (error) {
+      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Get('/get-files-tree')
+  @UseGuards(AuthGuard)
+  async getFilesTree(@Req() request: Request): Promise<FolderNode> {
+    try {
+      return await this.apptray.getFileTree(
+        request.cookies.token.split('-')[0],
+      );
+    } catch (error) {
+      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Get('/get-file')
+  @UseGuards(AuthGuard)
+  async getFile(@Body() body: GetFilesDTO, @Req() request: Request) {
+    try {
+      // TODO create function to get specified file
+    } catch (error) {
+      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+    }
   }
 
   @Post('/upload-file')
@@ -34,7 +85,7 @@ export class ApptrayController {
     @Req() request: Request,
   ): Promise<void> {
     try {
-      await this.apptray.upload(body, request.cookies.token.split('-')[0]);
+      await this.apptray.createFile(body, request.cookies.token.split('-')[0]);
     } catch (error) {
       throw new HttpException(error, HttpStatus.BAD_REQUEST);
     }
@@ -48,6 +99,72 @@ export class ApptrayController {
   ): Promise<void> {
     try {
       await this.apptray.createFolder(
+        body.path,
+        request.cookies.token.split('-')[0],
+      );
+    } catch (error) {
+      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Post('/rename-file')
+  @UseGuards(AuthGuard)
+  async renameFile(
+    @Body() body: RenameDTO,
+    @Req() request: Request,
+  ): Promise<void> {
+    try {
+      await this.apptray.renameFile(
+        body.filePath,
+        body.newName,
+        request.cookies.token.split('-')[0],
+      );
+    } catch (error) {
+      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Post('/rename-folder')
+  @UseGuards(AuthGuard)
+  async renameFolder(
+    @Body() body: RenameDTO,
+    @Req() request: Request,
+  ): Promise<void> {
+    try {
+      await this.apptray.renameFolder(
+        body.filePath,
+        body.newName,
+        request.cookies.token.split('-')[0],
+      );
+    } catch (error) {
+      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Delete('/delete-file')
+  @UseGuards(AuthGuard)
+  async deleteFile(
+    @Body() body: DeleteDTO,
+    @Req() request: Request,
+  ): Promise<void> {
+    try {
+      await this.apptray.deleteFile(
+        body.path,
+        request.cookies.token.split('-')[0],
+      );
+    } catch (error) {
+      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Delete('/delete-folder')
+  @UseGuards(AuthGuard)
+  async deleteFolder(
+    @Body() body: DeleteDTO,
+    @Req() request: Request,
+  ): Promise<void> {
+    try {
+      await this.apptray.deleteFolder(
         body.path,
         request.cookies.token.split('-')[0],
       );

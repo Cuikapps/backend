@@ -53,9 +53,62 @@ export class StorageService {
     }
   }
 
-  async deleteFile(path): Promise<void> {
+  async renameFile(
+    uid: string,
+    oldName: string,
+    newName: string,
+  ): Promise<void> {
+    await admin
+      .storage()
+      .bucket()
+      .file(`apptray/${uid}/${oldName}`)
+      .rename(`apptray/${uid}/${newName}`);
+  }
+
+  async renameApptrayFolder(
+    uid: string,
+    drive: string,
+    folderPath: string,
+    newFolderPath: string,
+  ): Promise<void> {
+    const files = await admin
+      .storage()
+      .bucket()
+      .getFiles({ prefix: `apptray/${uid}/${drive}` });
+
+    for (const file of files[0]) {
+      if (file.name.startsWith(`apptray/${uid}/${drive}/${folderPath}`)) {
+        const newFileName = `apptray/${uid}/${drive}/${newFolderPath}${file.name.substring(
+          file.name.lastIndexOf('>'),
+          file.name.length,
+        )}`;
+
+        file.rename(newFileName);
+      }
+    }
+  }
+
+  async deleteFile(path: string): Promise<void> {
     const file = admin.storage().bucket().file(path);
 
     await file.delete();
+  }
+
+  async deleteApptrayFolder(path: string, uid: string): Promise<void> {
+    const storagePath = `${path.substring(
+      0,
+      path.indexOf(':') + 1,
+    )}/${path.substring(path.indexOf(':') + 2, path.length)}`;
+
+    const res = await admin
+      .storage()
+      .bucket()
+      .getFiles({ prefix: `apptray/${uid}/${storagePath}` });
+
+    for (const file of res[0]) {
+      if (file.name.startsWith(`apptray/${uid}/${storagePath}`)) {
+        await file.delete();
+      }
+    }
   }
 }

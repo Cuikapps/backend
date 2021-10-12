@@ -6,7 +6,19 @@ export type UserConfigDocument = UserConfig & Document;
 @Schema()
 export class UserConfig {
   @Prop({ required: true })
-  installedApps: string[];
+  uid: string;
+
+  @Prop({ required: true })
+  searchEngine: string;
+
+  @Prop({ required: true })
+  mailProvider: string;
+
+  @Prop({ required: true })
+  theme: string;
+
+  @Prop({ required: true })
+  searchHistory: string[];
 }
 
 export const UserConfigSchema = SchemaFactory.createForClass(UserConfig);

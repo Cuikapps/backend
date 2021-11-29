@@ -19,7 +19,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PendingPasswordDocument } from '../schemas/pending-password.schema';
 import { EnvService } from '../feature/env/env.service';
-import { UserPassResetDto } from '../user/Dto/userPassReserDto';
+import { UserPassResetDto } from '../user/Dto/userPassReser.dto';
 import { StorageService } from '../feature/storage/storage.service';
 
 @Injectable()
@@ -37,11 +37,11 @@ export class AuthService {
   async signIn(email: string, password: string): Promise<string> {
     const user = await this.users.userByEmail(email);
 
-    if (bcrypt.compare(password, user.password)) {
+    if (bcrypt.compareSync(password, user.password)) {
       return await this.genAccessToken(email);
     } else {
       throw new HttpException(
-        'Wrong Email of Password',
+        'Wrong Email or Password',
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -90,7 +90,7 @@ export class AuthService {
   async deleteAccount(email: string, password: string): Promise<void> {
     const user = await this.users.userByEmail(email);
 
-    if (bcrypt.compare(password, user.password)) {
+    if (bcrypt.compareSync(password, user.password)) {
       this.users.deleteUser(user._id);
     } else {
       throw new HttpException('User Not Deleted', HttpStatus.BAD_REQUEST);
@@ -123,7 +123,7 @@ export class AuthService {
 
       await user.save();
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -135,7 +135,7 @@ export class AuthService {
 
       return new StreamableFile(fileBuffer);
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -178,7 +178,7 @@ export class AuthService {
 
   async verifyPasswordToken(token: string) {
     const pendingPass = await this.pendingPasswordModel.findById(token);
-    if (Date.now() < pendingPass.expire) {
+    if (pendingPass && Date.now() < pendingPass.expire) {
       const user = await this.users.userByEmail(pendingPass.email);
 
       user.password = await bcrypt.hash(pendingPass.newPassword, 10);
@@ -217,7 +217,10 @@ export class AuthService {
         }
       });
     } catch (error) {
-      throw new HttpException(error, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        error as string,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 

@@ -19,7 +19,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { AuthGuard } from '../gaurds/auth.guard';
+import { AuthGuard } from '../guards/auth.guard';
 import { UserAuthDto } from '../user/Dto/userAuth.dto';
 import { UserCreateDto } from '../user/Dto/userCreate.dto';
 import { UserService } from '../user/user.service';
@@ -27,7 +27,7 @@ import { AuthService } from './auth.service';
 import { UserUpdateDto } from '../user/Dto/userUpdate.dto';
 import { UserDto } from '../user/Dto/user.dto';
 import { EnvService } from '../feature/env/env.service';
-import { UserPassResetDto } from '../user/Dto/userPassReserDto';
+import { UserPassResetDto } from '../user/Dto/userPassReser.dto';
 import { FileDto } from './Dto/file.dto';
 @Controller('/auth')
 export class AuthController {
@@ -53,7 +53,7 @@ export class AuthController {
         sameSite: this.env.Dev ? undefined : 'none',
       });
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -100,7 +100,17 @@ export class AuthController {
       );
       return this.users.toSimpleUser(user);
     } catch (error) {
-      throw new HttpException(error, HttpStatus.UNAUTHORIZED);
+      throw new HttpException(error as string, HttpStatus.UNAUTHORIZED);
+    }
+  }
+
+  @Get('/get-token')
+  @UseGuards(AuthGuard)
+  async getToken(@Req() req: Request): Promise<{ token: string }> {
+    try {
+      return { token: encodeURIComponent(req.cookies['token']) };
+    } catch (error) {
+      throw new HttpException(error as string, HttpStatus.UNAUTHORIZED);
     }
   }
 
@@ -111,7 +121,7 @@ export class AuthController {
     try {
       return await this.users.deleteUser(req.cookies?.['token'].split('-')[0]);
     } catch (error) {
-      throw new HttpException(error, HttpStatus.UNAUTHORIZED);
+      throw new HttpException(error as string, HttpStatus.UNAUTHORIZED);
     }
   }
 
@@ -121,8 +131,6 @@ export class AuthController {
     @Req() req: Request,
     @Body() userUpdateDto: UserUpdateDto,
   ) {
-    console.log(userUpdateDto);
-
     // Gets the user by id using the uid in the auth token
     try {
       return await this.users.updateUser(
@@ -130,7 +138,7 @@ export class AuthController {
         userUpdateDto,
       );
     } catch (error) {
-      throw new HttpException(error, HttpStatus.UNAUTHORIZED);
+      throw new HttpException(error as string, HttpStatus.UNAUTHORIZED);
     }
   }
 
@@ -162,7 +170,7 @@ export class AuthController {
       </body>
       </html>`;
     } catch (error) {
-      throw new HttpException(error, HttpStatus.FORBIDDEN);
+      throw new HttpException(error as string, HttpStatus.FORBIDDEN);
     }
   }
 
@@ -181,7 +189,7 @@ export class AuthController {
     } catch (error) {
       console.log(error);
 
-      throw new HttpException(error, HttpStatus.CONFLICT);
+      throw new HttpException(error as string, HttpStatus.CONFLICT);
     }
   }
 
@@ -193,7 +201,7 @@ export class AuthController {
     try {
       return await this.auth.getUserImage(imgName);
     } catch (error) {
-      throw new HttpException(error, HttpStatus.CONFLICT);
+      throw new HttpException(error as string, HttpStatus.CONFLICT);
     }
   }
 
@@ -203,7 +211,7 @@ export class AuthController {
       const user = await this.users.userByEmail(email);
       await this.auth.verifyUserEmail(user);
     } catch (error) {
-      throw new HttpException(error, HttpStatus.CONFLICT);
+      throw new HttpException(error as string, HttpStatus.CONFLICT);
     }
   }
 
@@ -212,7 +220,7 @@ export class AuthController {
   async confirmEmailVerification(@Query('verification') verification: string) {
     const user = await this.users.userByEmail(verification.split('-')[0]);
 
-    if (this.auth.verifyConfirmationToken(verification)) {
+    if (await this.auth.verifyConfirmationToken(verification)) {
       user.emailVerified = true;
       await user.save();
 

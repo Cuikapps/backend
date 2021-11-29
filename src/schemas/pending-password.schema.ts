@@ -6,13 +6,13 @@ export type PendingPasswordDocument = PendingPassword & Document;
 @Schema()
 export class PendingPassword {
   @Prop({ required: true })
-  newPassword: string;
+  newPassword!: string;
 
   @Prop({ required: true })
-  email: string;
+  email!: string;
 
   @Prop({ required: true, index: { expires: 3600 } })
-  expire: number;
+  expire!: number;
 }
 
 export const PendingPasswordSchema =

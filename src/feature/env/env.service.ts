@@ -7,7 +7,7 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class EnvService {
   get Root(): string {
-    return process.env.APP_ROOT;
+    return process.env.APP_ROOT || 'http://localhost:3000/api';
   }
 
   get Dev(): boolean {

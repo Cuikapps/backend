@@ -22,20 +22,20 @@ export class UserService {
    * hashes the password to create document of user
    */
   async createUser(userData: UserCreateDto): Promise<UserDocument> {
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
-
-    const newUser = new this.usersModel({
-      email: userData.email,
-      emailVerified: false,
-      displayName: userData.displayName || this.emailToName(userData.email),
-      photoURL: 'No Image',
-      password: hashedPassword,
-    });
-
     try {
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+
+      const newUser = new this.usersModel({
+        email: userData.email,
+        emailVerified: false,
+        displayName: userData.displayName || this.emailToName(userData.email),
+        photoURL: 'No Image',
+        password: hashedPassword,
+      });
+
       return await newUser.save();
     } catch (error) {
-      throw new HttpException(error, HttpStatus.CONFLICT);
+      throw new HttpException(error as string, HttpStatus.CONFLICT);
     }
   }
 
@@ -49,7 +49,7 @@ export class UserService {
         return user;
       }
     } catch (error) {
-      throw new HttpException('Failed to get User', HttpStatus.CONFLICT);
+      throw new HttpException('Failed to get User', HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -63,7 +63,7 @@ export class UserService {
         return users;
       }
     } catch (error) {
-      throw new HttpException(error, HttpStatus.CONFLICT);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -77,7 +77,7 @@ export class UserService {
         return users;
       }
     } catch (error) {
-      throw new HttpException(error, HttpStatus.CONFLICT);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -85,26 +85,33 @@ export class UserService {
     userId: string,
     userData: UserUpdateDto,
   ): Promise<UserDocument> {
-    const user = await this.usersModel.findById(userId);
-
-    user.displayName = userData.displayName ?? user.displayName;
-    user.photoURL = userData.photoURL ?? user.photoURL;
-
     try {
-      return await user.save();
+      const user = await this.usersModel.findById(userId);
+
+      if (user) {
+        user.displayName = userData.displayName ?? user.displayName;
+        user.photoURL = userData.photoURL ?? user.photoURL;
+
+        return await user.save();
+      } else {
+        throw new HttpException("Couldn't get user", HttpStatus.CONFLICT);
+      }
     } catch (error) {
-      throw new HttpException(error, HttpStatus.CONFLICT);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
-  async deleteUser(userId: string): Promise<boolean> {
-    const user = await this.usersModel.findById(userId);
-
+  async deleteUser(userId: string): Promise<void> {
     try {
-      await user.delete();
-      return true;
+      const user = await this.usersModel.findById(userId);
+
+      if (user) {
+        await user.delete();
+      } else {
+        throw new HttpException("Couldn't get user", HttpStatus.CONFLICT);
+      }
     } catch (error) {
-      return false;
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 

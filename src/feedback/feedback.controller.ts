@@ -15,7 +15,7 @@ export class FeedbackController {
     try {
       this.feedback.create(feedback);
     } catch (error) {
-      throw new HttpException(error, 500);
+      throw new HttpException(error as string, 500);
     }
   }
 }

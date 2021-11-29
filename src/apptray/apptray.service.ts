@@ -14,6 +14,9 @@ import { StorageService } from '../feature/storage/storage.service';
 import { UploadFileDTO } from './Dto/uploadFile.dto';
 import { SettingsDTO } from './Dto/settings.dto';
 import { UserConfigDocument } from 'src/schemas/userConfig.schema';
+import * as fs from 'fs';
+import internal from 'stream';
+import { WsException } from '@nestjs/websockets';
 
 @Injectable()
 export class ApptrayService {
@@ -24,7 +27,7 @@ export class ApptrayService {
     private readonly userConfig: Model<UserConfigDocument>,
   ) {}
 
-  private async getUserConfig(uid): Promise<UserConfigDocument> {
+  private async getUserConfig(uid: string): Promise<UserConfigDocument> {
     return (
       (await this.userConfig.findOne({ uid: uid })) ??
       new this.userConfig({
@@ -46,7 +49,7 @@ export class ApptrayService {
         searchEngine: userSettings.searchEngine,
       };
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -75,17 +78,22 @@ export class ApptrayService {
         searchEngine: userSettings.searchEngine,
       };
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
-  private async getUserFiles(uid): Promise<FileTreeDocument> {
+  private async getUserFiles(uid: string): Promise<FileTreeDocument> {
     return (
       (await this.fileTree.findOne({ user: uid })) ??
       // Create a new file tree for user if they dont already have one
       new this.fileTree({
         user: uid,
-        tree: JSON.stringify({ folderName: 'root', files: [], folders: [] }),
+        tree: JSON.stringify({
+          folderName: 'root',
+          files: [],
+          folders: [],
+          metaData: { shared: [] },
+        }),
       })
     );
   }
@@ -102,11 +110,11 @@ export class ApptrayService {
         }
       );
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
-  async createFile(fileUpload: UploadFileDTO, uid: string) {
+  async createFile(fileUpload: UploadFileDTO, uid: string): Promise<void> {
     try {
       const userFiles = await this.getUserFiles(uid);
 
@@ -120,17 +128,18 @@ export class ApptrayService {
         );
       }
 
-      // The modified file path for GCP Storage
-      const storagePath = `${fileUpload.path.substring(
+      // Params for the uploadFile Function
+      const drive = fileUpload.path.substring(
         0,
         fileUpload.path.indexOf(':') + 1,
-      )}/${fileUpload.path.substring(
+      );
+      const folderPath = fileUpload.path.substring(
         fileUpload.path.indexOf(':') + 2,
         fileUpload.path.length,
-      )}`;
+      );
 
       await this.storage.uploadFile(
-        `apptray/${uid}/${storagePath}`,
+        `apptray/${uid}/${drive}/${folderPath}`,
         fileUpload.formData.file_buffer,
         fileUpload.formData.type,
       );
@@ -154,7 +163,88 @@ export class ApptrayService {
 
       await userFiles.save();
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async continueFileCreation(
+    fileUpload: UploadFileDTO,
+    uid: string,
+    writer?: internal.Writable,
+  ): Promise<internal.Writable> {
+    try {
+      // Checks for 2 or more occurrences of '>'
+      if (fileUpload.path.includes('>>')) {
+        throw new WsException('Invalid Path: ' + fileUpload.path);
+      }
+
+      // Params for the continueUploadFile Function
+      const drive = fileUpload.path.substring(
+        0,
+        fileUpload.path.indexOf(':') + 1,
+      );
+      const folderPath = fileUpload.path.substring(
+        fileUpload.path.indexOf(':') + 2,
+        fileUpload.path.length,
+      );
+
+      const write = await this.storage.continueUploadFile(
+        `apptray/${uid}/${drive}/${folderPath}`,
+        fileUpload.formData.file_buffer,
+        fileUpload.formData.type,
+        writer,
+      );
+
+      return write;
+    } catch (error) {
+      throw new WsException(error as string);
+    }
+  }
+
+  async finishFileCreation(
+    fileUpload: UploadFileDTO,
+    uid: string,
+    writer: internal.Writable,
+  ): Promise<void> {
+    try {
+      const userFiles = await this.getUserFiles(uid);
+
+      const tree: FolderNode = JSON.parse(userFiles.tree);
+      // Checks for 2 or more occurrences of '>'
+      if (fileUpload.path.includes('>>')) {
+        throw new WsException('Invalid Path: ' + fileUpload.path);
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        writer.once('error', (err) => {
+          reject(err);
+        });
+        writer.end(() => {
+          writer.removeAllListeners();
+          resolve();
+        });
+      });
+
+      const filePath = fileUpload.path
+        .substring(0, fileUpload.path.lastIndexOf('>'))
+        .split('>');
+      const fileName = fileUpload.path.substring(
+        fileUpload.path.lastIndexOf('>') + 1,
+        fileUpload.path.length,
+      );
+
+      // Update the file tree with the new added file
+      userFiles.tree = JSON.stringify(
+        this.createFileInTree(tree, filePath, {
+          fileName,
+          fileType: fileUpload.formData.type,
+          metaData: { shared: [] },
+        }),
+      );
+
+      await userFiles.save();
+    } catch (error) {
+      throw new WsException(error as string);
     }
   }
 
@@ -189,11 +279,39 @@ export class ApptrayService {
 
       await userFiles.save();
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
-  async renameFile(oldPath: string, newName: string, uid: string) {
+  async getFiles(
+    path: string,
+    fileNames: string[],
+    uid: string,
+  ): Promise<string> {
+    // Checks for 2 or more occurrences of '>'
+    if (path.includes('>>')) {
+      throw new HttpException('Invalid Path: ' + path, HttpStatus.BAD_REQUEST);
+    }
+
+    // Params for the renameFile Function
+    const drive = path.substring(0, path.indexOf(':') + 1);
+    const folderPath = path.substring(path.indexOf(':') + 2, path.length);
+
+    const binary = await this.storage.readApptrayFiles(
+      uid,
+      drive,
+      folderPath,
+      fileNames,
+    );
+
+    return binary;
+  }
+
+  async renameFile(
+    oldPath: string,
+    newName: string,
+    uid: string,
+  ): Promise<void> {
     try {
       const userFiles = await this.getUserFiles(uid);
 
@@ -207,21 +325,18 @@ export class ApptrayService {
         );
       }
 
-      // The modified file path for GCP Storage
-      const oldStoragePath = `${oldPath.substring(
-        0,
-        oldPath.indexOf(':') + 1,
-      )}/${oldPath.substring(oldPath.indexOf(':') + 2, oldPath.length)}`;
-
-      const newStoragePath = `${oldPath.substring(
-        0,
-        oldPath.indexOf(':') + 1,
-      )}/${oldPath.substring(
+      // Params for the renameFile Function
+      const drive = oldPath.substring(0, oldPath.indexOf(':') + 1);
+      const folderPath = oldPath.substring(
+        oldPath.indexOf(':') + 2,
+        oldPath.length,
+      );
+      const newFolderPath = `${oldPath.substring(
         oldPath.indexOf(':') + 2,
         oldPath.lastIndexOf('>') + 1,
       )}${newName}`;
 
-      await this.storage.renameFile(uid, oldStoragePath, newStoragePath);
+      await this.storage.renameFile(uid, drive, folderPath, newFolderPath);
 
       const filePath = oldPath
         .substring(0, oldPath.lastIndexOf('>'))
@@ -238,11 +353,15 @@ export class ApptrayService {
 
       await userFiles.save();
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
-  async renameFolder(oldPath: string, newName: string, uid: string) {
+  async renameFolder(
+    oldPath: string,
+    newName: string,
+    uid: string,
+  ): Promise<void> {
     try {
       const userFiles = await this.getUserFiles(uid);
 
@@ -283,7 +402,7 @@ export class ApptrayService {
 
       await userFiles.save();
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -320,7 +439,7 @@ export class ApptrayService {
 
       await userFiles.save();
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -352,7 +471,7 @@ export class ApptrayService {
 
       await userFiles.save();
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -375,21 +494,18 @@ export class ApptrayService {
     }
 
     // Runs to add folder if the parent folder exists.
-    if (fileTree.folders.length > 0) {
-      for (let i = 0; i < fileTree.folders.length; i++) {
-        if (fileTree.folders[i].folderName === filePath[0]) {
-          filePath.shift();
+    for (let i = 0; i < fileTree.folders.length; i++) {
+      if (fileTree.folders[i].folderName === filePath[0]) {
+        filePath.shift();
 
-          fileTree.folders[i] = this.createFileInTree(
-            fileTree.folders[i],
-            filePath,
-            file,
-          );
+        fileTree.folders[i] = this.createFileInTree(
+          fileTree.folders[i],
+          filePath,
+          file,
+        );
 
-          break;
-        }
+        return fileTree;
       }
-      return fileTree;
     }
 
     // Runs if no parent folder was found then adds the parent folder.
@@ -437,21 +553,18 @@ export class ApptrayService {
     }
 
     // Runs to add folder if the parent folder exists.
-    if (fileTree.folders.length > 0) {
-      for (let i = 0; i < fileTree.folders.length; i++) {
-        if (fileTree.folders[i].folderName === filePath[0]) {
-          filePath.shift();
+    for (let i = 0; i < fileTree.folders.length; i++) {
+      if (fileTree.folders[i].folderName === filePath[0]) {
+        filePath.shift();
 
-          fileTree.folders[i] = this.createFolderInTree(
-            fileTree.folders[i],
-            filePath,
-            folder,
-          );
+        fileTree.folders[i] = this.createFolderInTree(
+          fileTree.folders[i],
+          filePath,
+          folder,
+        );
 
-          break;
-        }
+        return fileTree;
       }
-      return fileTree;
     }
 
     // Runs if no parent folder was found then adds the parent folder.
@@ -501,7 +614,7 @@ export class ApptrayService {
     }
 
     // Runs to add folder if the parent folder exists.
-    if (fileTree.folders.length > 0) {
+    if (filePath.length > 0) {
       for (let i = 0; i < fileTree.folders.length; i++) {
         if (fileTree.folders[i].folderName === filePath[0]) {
           filePath.shift();
@@ -569,7 +682,7 @@ export class ApptrayService {
     }
 
     // Runs to add folder if the parent folder exists.
-    if (fileTree.folders.length > 1) {
+    if (filePath.length > 1) {
       for (let i = 0; i < fileTree.folders.length; i++) {
         if (fileTree.folders[i].folderName === filePath[0]) {
           filePath.shift();
@@ -632,34 +745,6 @@ export class ApptrayService {
       return fileTree;
     }
 
-    // Runs to add folder if the parent folder exists.
-    if (fileTree.folders.length > 0) {
-      for (let i = 0; i < fileTree.folders.length; i++) {
-        if (fileTree.folders[i].folderName === filePath[0]) {
-          filePath.shift();
-
-          fileTree.folders[i] = this.deleteFileInTree(
-            fileTree.folders[i],
-            filePath,
-            fileName,
-          );
-
-          break;
-        }
-      }
-      return fileTree;
-    }
-
-    // Runs if no parent folder was found then adds the parent folder.
-    fileTree.folders.push({
-      folderName: filePath[0],
-      folders: [],
-      files: [],
-      metaData: {
-        shared: [],
-      },
-    });
-
     for (let i = 0; i < fileTree.folders.length; i++) {
       if (fileTree.folders[i].folderName === filePath[0]) {
         filePath.shift();
@@ -673,6 +758,7 @@ export class ApptrayService {
         break;
       }
     }
+
     return fileTree;
   }
 

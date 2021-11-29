@@ -1,3 +1,5 @@
+import { CookieService } from './feature/cookie/cookie.service';
+import { FileUploadGateway } from './apptray/file-upload.gateway';
 import { ApptrayModule } from './apptray/apptray.module';
 import { FeatureModule } from './feature/feature.module';
 import { NewsModule } from './news/news.module';

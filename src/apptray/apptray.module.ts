@@ -9,6 +9,7 @@ import { AuthModule } from '../auth/auth.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { FileTreeSchema } from '../schemas/fileTree.schema';
 import { UserConfigSchema } from '../schemas/userConfig.schema';
+import { FileUploadGateway } from './file-upload.gateway';
 
 @Module({
   imports: [
@@ -35,7 +36,7 @@ import { UserConfigSchema } from '../schemas/userConfig.schema';
     ),
   ],
   controllers: [ApptrayController],
-  providers: [ApptrayService],
+  providers: [ApptrayService, FileUploadGateway],
   exports: [ApptrayService],
 })
 export class ApptrayModule {}

@@ -1,27 +1,22 @@
-/*
-https://docs.nestjs.com/controllers#controllers
-*/
-
 import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpException,
   HttpStatus,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { FolderNode } from 'src/schemas/fileTree.schema';
-import { AuthGuard } from '../gaurds/auth.guard';
+import { AuthGuard } from '../guards/auth.guard';
 import { ApptrayService } from './apptray.service';
+import { BinaryDTO } from './Dto/binary.dto';
 import { DeleteDTO } from './Dto/delete.dto';
-import { GetFilesDTO } from './Dto/getFile.dto';
 import { RenameDTO } from './Dto/rename.dto';
 import { SettingsDTO } from './Dto/settings.dto';
-import { UploadFileDTO } from './Dto/uploadFile.dto';
 import { UploadFolderDTO } from './Dto/uploadFolder.dto';
 
 @Controller('/apptray')
@@ -36,7 +31,7 @@ export class ApptrayController {
         request.cookies.token.split('-')[0],
       );
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -52,7 +47,7 @@ export class ApptrayController {
         request.cookies.token.split('-')[0],
       );
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -64,30 +59,28 @@ export class ApptrayController {
         request.cookies.token.split('-')[0],
       );
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
-  @Get('/get-file')
+  @Get('/get-files')
   @UseGuards(AuthGuard)
-  async getFile(@Body() body: GetFilesDTO, @Req() request: Request) {
-    try {
-      // TODO create function to get specified file
-    } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
-    }
-  }
-
-  @Post('/upload-file')
-  @UseGuards(AuthGuard)
-  async uploadFile(
-    @Body() body: UploadFileDTO,
+  async getFiles(
+    @Query('data') body: string,
     @Req() request: Request,
-  ): Promise<void> {
+  ): Promise<BinaryDTO> {
     try {
-      await this.apptray.createFile(body, request.cookies.token.split('-')[0]);
+      const data = JSON.parse(decodeURIComponent(body));
+
+      const bin = await this.apptray.getFiles(
+        data.path,
+        data.names,
+        request.cookies.token.split('-')[0],
+      );
+
+      return { bin };
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -103,7 +96,7 @@ export class ApptrayController {
         request.cookies.token.split('-')[0],
       );
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -120,7 +113,7 @@ export class ApptrayController {
         request.cookies.token.split('-')[0],
       );
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -137,11 +130,11 @@ export class ApptrayController {
         request.cookies.token.split('-')[0],
       );
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
-  @Delete('/delete-file')
+  @Post('/delete-file')
   @UseGuards(AuthGuard)
   async deleteFile(
     @Body() body: DeleteDTO,
@@ -153,11 +146,11 @@ export class ApptrayController {
         request.cookies.token.split('-')[0],
       );
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 
-  @Delete('/delete-folder')
+  @Post('/delete-folder')
   @UseGuards(AuthGuard)
   async deleteFolder(
     @Body() body: DeleteDTO,
@@ -169,7 +162,7 @@ export class ApptrayController {
         request.cookies.token.split('-')[0],
       );
     } catch (error) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw new HttpException(error as string, HttpStatus.BAD_REQUEST);
     }
   }
 }

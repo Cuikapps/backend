@@ -7,10 +7,10 @@ export type FileTreeDocument = FileTree & Document;
 @Schema()
 export class FileTree {
   @Prop({ required: true })
-  user: string;
+  user!: string;
 
   @Prop({ required: true })
-  tree: string;
+  tree!: string;
 }
 
 export const FileTreeSchema = SchemaFactory.createForClass(FileTree);

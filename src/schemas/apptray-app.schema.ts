@@ -7,25 +7,25 @@ export type AppDocument = App & Document;
 @Schema()
 export class App {
   @Prop({ required: true })
-  title: string;
+  title!: string;
 
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
-  owner: User;
+  owner!: User;
 
   @Prop({ required: true })
-  created: string;
+  created!: string;
 
   @Prop({ required: true })
-  updated: string;
+  updated!: string;
 
   @Prop({ required: true })
-  downloads: number;
+  downloads!: number;
 
   @Prop({ required: true })
-  image: string;
+  image!: string;
 
   @Prop({ required: true })
-  ratedBy: [
+  ratedBy!: [
     {
       uid: string;
       rating: number;
@@ -33,10 +33,10 @@ export class App {
   ];
 
   @Prop({ required: true })
-  numberOfReviews: number;
+  numberOfReviews!: number;
 
   @Prop({ required: true })
-  stars: number;
+  stars!: number;
 }
 
 export const AppSchema = SchemaFactory.createForClass(App);

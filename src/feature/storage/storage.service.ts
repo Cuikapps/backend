@@ -111,6 +111,8 @@ export class StorageService {
 
       const waitingForDownload: Promise<[string, Buffer]>[] = [];
 
+      let fileSizes = 0;
+
       for (const file of files[0]) {
         if (
           filesNames.includes(
@@ -124,6 +126,14 @@ export class StorageService {
               .replace(new RegExp('>.*'), ''),
           )
         ) {
+          fileSizes += file.metadata.size;
+
+          if (fileSizes >= 2_000_000_000) {
+            throw new HttpException(
+              'File size is more than 2GB',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
           const data: Buffer[] = [];
 
           waitingForDownload.push(
@@ -180,7 +190,7 @@ export class StorageService {
   ): Promise<void> {
     try {
       const newPath =
-        oldName.substring(0, oldName.lastIndexOf('>') + 1) + newName;
+        oldName.substring(0, oldName.lastIndexOf('/') + 1) + newName;
       const fileExt = newName.substring(
         newName.lastIndexOf('.') + 1,
         newName.length,
@@ -227,7 +237,7 @@ export class StorageService {
             `apptray/${uid}/${drive}/${folderPath}`.length,
             file.name.lastIndexOf('>'),
           )}${file.name.substring(
-            file.name.lastIndexOf('>'),
+            file.name.lastIndexOf('>') + 1,
             file.name.length,
           )}`;
 
